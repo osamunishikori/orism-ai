@@ -31,6 +31,30 @@ const ORISM_DOCTRINE = `
 ・地域ナンバーワン中小工務店として、誠実さと専門性を両立
 `;
 
+// ===== 経営コンサル用（案A向け）=====
+const ORISM_CONSULT_DOCTRINE = `
+【オリズム式 工務店経営コンサルの鉄則】
+・地域ナンバーワン中小工務店を目指す経営哲学
+・売上より利益、利益より粗利率を重視
+・社長自身が営業の最前線に立つ組織づくり
+・下請け脱却・元請け強化・自社ブランド化が3本柱
+・Web集客とリアル集客のバランス（地域密着 × デジタル活用）
+・数字で語る。感覚ではなくKPIで経営判断
+・小さく始めて早く改善。PDCAを週単位で回す
+`;
+
+// ===== 集客支援用（案B向け）=====
+const ORISM_MARKETING_DOCTRINE = `
+【オリズム式 集客コンテンツの鉄則】
+・会社の自慢ではなく、お客様の「憧れ」や「不安」にフォーカス
+・住まいの悩みに寄り添う温かい文体、親近感のある言葉選び
+・地域名・地域ネタを入れて地元感を演出
+・施工事例・お客様の声など「写真で語れる要素」を最大限活用
+・売り込み感を出さず、読んだ人が「相談してみたい」と感じる導線
+・専門用語は使わず、家づくり初心者にもわかる言葉で
+・「家」ではなく「暮らし」を売る視点
+`;
+
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600;700&family=Noto+Sans+JP:wght@300;400;500&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -106,6 +130,11 @@ const STYLES = `
   .tone-btn { padding: 6px 14px; border: 1px solid #d8d8d8; background: #fafafa; border-radius: 2px; font-size: 12px; font-family: 'Noto Sans JP', sans-serif; cursor: pointer; color: #4a4a4a; transition: all 0.15s; }
   .tone-btn.selected { background: #2a2a2a; color: #ffffff; border-color: #2a2a2a; }
   .error { background: #fff5f5; border: 1px solid #f0c0c0; color: #c04040; padding: 10px 14px; border-radius: 2px; font-size: 12px; margin-top: 12px; }
+  .header-right { display: flex; align-items: center; gap: 18px; }
+  .mode-selector { display: flex; gap: 3px; }
+  .mode-btn { padding: 7px 14px; background: #1a1a1a; color: #999999; border: 1px solid #4a4a4a; border-radius: 2px; font-family: 'Noto Sans JP', sans-serif; font-size: 11px; cursor: pointer; letter-spacing: 0.08em; transition: all 0.15s; }
+  .mode-btn:hover:not(.active) { color: #cccccc; border-color: #6a6a6a; }
+  .mode-btn.active { background: #7a1526; color: #ffffff; border-color: #7a1526; font-weight: 600; }
   .industry-selector { display: flex; align-items: center; gap: 10px; }
   .industry-label { font-size: 10px; color: #999999; letter-spacing: 0.08em; }
   .industry-select { padding: 5px 10px; background: #1a1a1a; color: #ffffff; border: 1px solid #4a4a4a; border-radius: 2px; font-family: 'Noto Sans JP', sans-serif; font-size: 12px; cursor: pointer; outline: none; }
@@ -672,6 +701,323 @@ ${docType === "お詫び書面・メール" || docType === "両方" ? `【お詫
   );
 }
 
+// ===== 汎用AIタブ（設定駆動。案A・案Bの全タブで使用）=====
+function GenericAITab({ badgeLabel, title, description, cautionNote, formFields, buildSystem, buildUserMessage, resultLabel }) {
+  const [form, setForm] = useState(() =>
+    Object.fromEntries(formFields.map(f => [f.key, f.default ?? (f.type === "select" && f.options ? f.options[0] : "")]))
+  );
+  const [result, setResult] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const generate = async () => {
+    setLoading(true); setError(""); setResult("");
+    try {
+      setResult(await callClaude(buildSystem(form), buildUserMessage(form)));
+    } catch (e) { setError("エラー: " + e.message); }
+    finally { setLoading(false); }
+  };
+  const copy = () => { navigator.clipboard.writeText(result); setCopied(true); setTimeout(() => setCopied(false), 2000); };
+
+  return (
+    <div>
+      <div className="nikken-badge">ORism AI — {badgeLabel}</div>
+      <div className="section-title">{title}</div>
+      <p className="section-desc">{description}</p>
+      {cautionNote && <div className="crisis-banner">{cautionNote}</div>}
+      <div className="card">
+        <div className="card-title">入力</div>
+        <div className="form-grid">
+          {formFields.map(f => (
+            <div key={f.key} className={`form-group ${f.full ? "full" : ""}`}>
+              <label>{f.label}</label>
+              {f.type === "select" ? (
+                <select value={form[f.key]} onChange={e => set(f.key, e.target.value)}>
+                  {f.options.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              ) : f.type === "textarea" ? (
+                <textarea placeholder={f.placeholder} value={form[f.key]} onChange={e => set(f.key, e.target.value)} />
+              ) : (
+                <input placeholder={f.placeholder} value={form[f.key]} onChange={e => set(f.key, e.target.value)} />
+              )}
+            </div>
+          ))}
+        </div>
+        <button className="btn" onClick={generate} disabled={loading}>
+          {loading ? <span className="btn-loading"><span className="spinner" />生成中...</span> : `${resultLabel}を生成する`}
+        </button>
+      </div>
+      {error && <div className="error">{error}</div>}
+      {result && <div className="result"><span className="result-badge">{resultLabel}</span><div className="result-content"><button className="copy-btn" onClick={copy}>{copied ? "コピー済 ✓" : "コピー"}</button>{result}</div></div>}
+    </div>
+  );
+}
+
+// ===== 案A：経営コンサルタブ =====
+const CONSULT_TABS = [
+  {
+    label: "📊 経営診断",
+    props: {
+      badgeLabel: "経営診断",
+      title: "経営診断AI",
+      description: "月商・粗利率・受注状況から、中小工務店の経営課題と改善策を診断します。",
+      resultLabel: "経営診断レポート",
+      formFields: [
+        { key: "revenue", label: "月商（万円）", placeholder: "例：3000" },
+        { key: "grossMargin", label: "粗利率（%）", placeholder: "例：25" },
+        { key: "contracts", label: "年間受注棟数", placeholder: "例：12" },
+        { key: "employees", label: "従業員数", placeholder: "例：8" },
+        { key: "area", label: "対応エリア", placeholder: "例：○○県中部", full: true },
+        { key: "concern", label: "現在の課題・気になっている点", type: "textarea", placeholder: "例：粗利が改善しない、元請け案件が増えない、職人の高齢化…", full: true },
+      ],
+      buildSystem: () => `あなたはオリズム代表の工務店経営コンサルタントです。${ORISM_CONSULT_DOCTRINE}
+相談は地域密着の中小工務店経営者からのものです。提出された数字から、SWOT観点の経営診断、粗利改善に効く施策3点、3ヶ月で実行可能なアクションプランを出してください。
+
+出力形式：
+【経営スナップショット】（3行で現状を要約）
+【SWOT簡易診断】S/W/O/T 各2点
+【今すぐ効く改善策 TOP3】（粗利・集客・組織のバランスで。各施策について「期待効果」「実行コスト」「所要期間」を明記）
+【3ヶ月アクションプラン】（週単位のマイルストーン）`,
+      buildUserMessage: f => `月商：${f.revenue}万円\n粗利率：${f.grossMargin}%\n年間受注棟数：${f.contracts}棟\n従業員数：${f.employees}名\n対応エリア：${f.area}\n経営者の気になっている点：\n${f.concern}`,
+    }
+  },
+  {
+    label: "💰 値決め・粗利改善",
+    props: {
+      badgeLabel: "値決め・粗利改善",
+      title: "値決め・粗利改善AI",
+      description: "原価・競合相場・差別化要素から、受注も粗利も落とさない適正価格を提案します。",
+      resultLabel: "価格戦略レポート",
+      formFields: [
+        { key: "grade", label: "商品グレード", type: "select", options: ["高性能住宅", "標準住宅", "ローコスト住宅", "自然素材系", "デザイン住宅"] },
+        { key: "cost", label: "原価坪単価（万円）", placeholder: "例：55" },
+        { key: "competitor", label: "競合の平均坪単価（万円）", placeholder: "例：75" },
+        { key: "targetMargin", label: "目標粗利率（%）", placeholder: "例：28" },
+        { key: "differentiator", label: "自社の差別化要素・強み", type: "textarea", placeholder: "例：UA値0.46、自社大工、アフター永年保証、補助金活用サポート…", full: true },
+      ],
+      buildSystem: () => `あなたはオリズム代表の工務店経営コンサルタントです。${ORISM_CONSULT_DOCTRINE}
+値決めは「安さで勝つ」ではなく「価値で納得してもらう」が鉄則です。原価・競合・差別化から、受注を逃さず粗利を守れる価格戦略を提案してください。
+
+出力形式：
+【適正坪単価の提案】（3パターン：安全/推奨/攻め。各パターンの粗利率と受注確度コメント）
+【値決めロジック】（なぜその価格か、顧客に説明できる理由3点）
+【お客様への説明トークスクリプト】（売り込み感なし、オリズム式の寄り添い型で）
+【粗利改善のための付帯施策】（オプション販売・契約の磨き込みなど3点）`,
+      buildUserMessage: f => `商品グレード：${f.grade}\n原価坪単価：${f.cost}万円\n競合の平均坪単価：${f.competitor}万円\n目標粗利率：${f.targetMargin}%\n差別化要素：\n${f.differentiator}`,
+    }
+  },
+  {
+    label: "📈 集客戦略",
+    props: {
+      badgeLabel: "集客戦略",
+      title: "集客戦略AI",
+      description: "エリア・ターゲット・予算から、費用対効果の高い集客チャネル配分を提案します。",
+      resultLabel: "集客戦略プラン",
+      formFields: [
+        { key: "area", label: "対応エリア", placeholder: "例：○○県中部" },
+        { key: "target", label: "ターゲット年代", type: "select", options: ["20代後半〜30代前半（一次取得層）", "30代後半〜40代（建替え・子育て世代）", "40代〜50代（2世帯・終の棲家）", "60代以上（終活・リフォーム）", "全年代"] },
+        { key: "budget", label: "月額広告予算（万円）", placeholder: "例：30" },
+        { key: "current", label: "現在使っている集客チャネル", type: "textarea", placeholder: "例：SUUMO掲載、Instagram投稿、紹介のみ…", full: true },
+        { key: "goal", label: "集客目標（月間問い合わせ数など）", placeholder: "例：月5件の見学予約", full: true },
+      ],
+      buildSystem: () => `あなたはオリズム代表の工務店経営コンサルタントです。${ORISM_CONSULT_DOCTRINE}
+地域密着中小工務店に最適化した集客戦略を提案してください。広告費用対効果と地域密着性を両立させます。
+
+出力形式：
+【チャネル配分プラン】（Web広告／SNS／リアル／紹介 の推奨配分比率と月額予算内訳）
+【優先度TOP3の施策】（各施策の期待月間問い合わせ数、実行コスト、立ち上げ所要期間）
+【1ヶ月目の実行プラン】（週単位でやること）
+【計測すべきKPI】（3つ、数字で追える指標）`,
+      buildUserMessage: f => `エリア：${f.area}\nターゲット年代：${f.target}\n月額広告予算：${f.budget}万円\n現在の集客チャネル：\n${f.current}\n集客目標：${f.goal}`,
+    }
+  },
+  {
+    label: "🎯 営業トーク",
+    props: {
+      badgeLabel: "営業トーク",
+      title: "営業トーク・差別化AI",
+      description: "競合との比較・お客様の悩みから、受注に効く差別化トークと反論対応を生成します。",
+      resultLabel: "営業トークスクリプト",
+      formFields: [
+        { key: "competitor", label: "競合会社名・タイプ", placeholder: "例：大手ハウスメーカーA社、地場ビルダーB社" },
+        { key: "competitorStrength", label: "競合の強み", placeholder: "例：ブランド安心感、大規模展示場" },
+        { key: "ourStrength", label: "自社の強み", placeholder: "例：高気密高断熱、自社大工" },
+        { key: "priceDiff", label: "価格差", type: "select", options: ["自社が安い", "ほぼ同じ", "自社が高い（1割程度）", "自社が高い（2割以上）"] },
+        { key: "concern", label: "お客様の悩み・不安", type: "textarea", placeholder: "例：光熱費、予算オーバー、職人の質、アフター対応…", full: true },
+      ],
+      buildSystem: () => `あなたはオリズム式営業メソッドを熟知した中小工務店の営業コンサルタントです。${ORISM_DOCTRINE}${ORISM_CONSULT_DOCTRINE}
+競合比較と自社差別化を元に、売り込み感ゼロで受注に効くトークスクリプトを作成してください。
+
+出力形式：
+【差別化の芯（これだけは外さない訴求点）】（3点）
+【お客様の悩みに寄り添う導入トーク】（30秒で話せる自然な会話調）
+【競合と比較された時の対応トーク】（価格差に触れつつ、値引きせず価値で納得させる）
+【よくある反論への返答】
+Q: 「もう少し安くなりませんか？」
+A: 〜
+Q: 「大手の方が安心では？」
+A: 〜
+Q: 「もう少し検討させてください」
+A: 〜`,
+      buildUserMessage: f => `競合：${f.competitor}\n競合の強み：${f.competitorStrength}\n自社の強み：${f.ourStrength}\n価格差：${f.priceDiff}\nお客様の悩み：\n${f.concern}`,
+    }
+  },
+  {
+    label: "📝 セミナー台本",
+    props: {
+      badgeLabel: "セミナー台本",
+      title: "セミナー台本生成AI",
+      description: "テーマと所要時間から、集客セミナー・勉強会の完全な進行台本を生成します。",
+      resultLabel: "セミナー台本",
+      formFields: [
+        { key: "theme", label: "セミナーのテーマ", placeholder: "例：失敗しない家づくり勉強会", full: true },
+        { key: "duration", label: "所要時間", type: "select", options: ["60分", "90分", "120分", "180分"] },
+        { key: "target", label: "対象参加者", type: "select", options: ["家づくり検討初期の20代〜30代", "建替え検討の40代〜50代", "土地から探す層", "リフォーム層", "全世代向け"] },
+        { key: "appeal", label: "主な訴求ポイント・伝えたいこと", type: "textarea", placeholder: "例：高気密高断熱の光熱費効果、資金計画の罠、失敗事例の紹介…", full: true },
+      ],
+      buildSystem: () => `あなたはオリズム式営業メソッドを熟知した中小工務店のセミナー講師コンサルタントです。${ORISM_DOCTRINE}${ORISM_CONSULT_DOCTRINE}
+売り込み感ゼロで、終了後に「この会社に相談したい」と自然に思われるセミナー台本を作成してください。
+
+出力形式：
+【セミナータイトル案】（3案）
+【進行アジェンダ】（時間配分つき）
+【オープニングトーク】（自然な会話調、5分）
+【本編の要点スライド構成】（見出し＋1枚ごとに話す内容のサマリ）
+【クロージングトーク】（次のアクションに自然に誘導、3分）
+【配布物の提案】（3点）`,
+      buildUserMessage: f => `テーマ：${f.theme}\n所要時間：${f.duration}\n対象参加者：${f.target}\n訴求したいポイント：\n${f.appeal}`,
+    }
+  },
+];
+
+// ===== 案B：集客支援タブ =====
+const MARKETING_TABS = [
+  {
+    label: "📱 Instagram投稿",
+    props: {
+      badgeLabel: "Instagram投稿",
+      title: "Instagram投稿文生成AI",
+      description: "施工写真やイベント写真に合わせた、地域密着の投稿キャプションとハッシュタグを生成します。",
+      resultLabel: "Instagram投稿文",
+      formFields: [
+        { key: "theme", label: "投稿テーマ", placeholder: "例：新築お引き渡し写真、完成見学会告知、施主さんのインタビュー" },
+        { key: "area", label: "地域名（ハッシュタグ用）", placeholder: "例：○○市" },
+        { key: "tone", label: "トーン", type: "select", options: ["温かみのある家族系", "スタイリッシュ・デザイン系", "ナチュラル・自然素材系", "お役立ち情報系"] },
+        { key: "point", label: "伝えたいポイント", type: "textarea", placeholder: "例：吹き抜けの開放感、薪ストーブ、高気密高断熱、施主さんの笑顔…", full: true },
+      ],
+      buildSystem: () => `あなたはオリズム式集客メソッドを習得した中小工務店のSNS担当です。${ORISM_MARKETING_DOCTRINE}
+売り込み感ゼロで、ユーザーが「いいね」したくなる自然なInstagramキャプションを書いてください。
+
+出力形式：
+【キャプション本文】（200〜400字、絵文字ほどよく、改行多めの読みやすいInstagram向け）
+【ハッシュタグ】（#30個以内。地域系・家づくり系・トレンド系をバランスよく）
+【投稿アドバイス】（時間帯・画像構成のコツ 2〜3点）`,
+      buildUserMessage: f => `投稿テーマ：${f.theme}\n地域：${f.area}\nトーン：${f.tone}\n伝えたいポイント：\n${f.point}`,
+    }
+  },
+  {
+    label: "📰 ブログ記事",
+    props: {
+      badgeLabel: "ブログ記事",
+      title: "ブログ記事生成AI",
+      description: "SEOキーワードと想定読者から、検索流入を狙ったブログ記事の構成・本文を生成します。",
+      resultLabel: "ブログ記事",
+      formFields: [
+        { key: "keyword", label: "SEOキーワード", placeholder: "例：○○市 注文住宅 坪単価" },
+        { key: "audience", label: "想定読者", placeholder: "例：30代前半、共働き、土地探しから" },
+        { key: "length", label: "目安文字数", type: "select", options: ["2000字（コンパクト）", "3000字（標準）", "5000字（しっかり）"] },
+        { key: "angle", label: "記事の切り口・伝えたいこと", type: "textarea", placeholder: "例：坪単価のからくりを正直に解説、○○市の相場、失敗しない選び方…", full: true },
+      ],
+      buildSystem: () => `あなたはオリズム式集客メソッドを習得した中小工務店のWebライターです。${ORISM_MARKETING_DOCTRINE}
+検索ユーザーが満足する、SEOとユーザー体験を両立したブログ記事を書いてください。
+
+出力形式：
+【タイトル案】（3案、検索意図に合うもの）
+【メタディスクリプション】（120字以内）
+【記事構成（H2/H3見出し）】
+【本文】（指定文字数目安で、セクションごとに分けて）
+【記事末のCTA】（来場予約や資料請求に自然誘導、売り込み感なし）`,
+      buildUserMessage: f => `SEOキーワード：${f.keyword}\n想定読者：${f.audience}\n目安文字数：${f.length}\n記事の切り口：\n${f.angle}`,
+    }
+  },
+  {
+    label: "📧 LINE配信",
+    props: {
+      badgeLabel: "LINE一斉配信",
+      title: "LINE一斉配信文生成AI",
+      description: "配信目的とセグメントから、開封・クリックされるLINE配信文を生成します。",
+      resultLabel: "LINE配信文",
+      formFields: [
+        { key: "purpose", label: "配信目的", type: "select", options: ["見学会・イベント告知", "キャンペーン告知", "お役立ち情報シェア", "お引き渡し事例紹介", "お客様の声紹介"] },
+        { key: "segment", label: "配信対象", type: "select", options: ["全友だち", "見学会参加済み", "資料請求済み", "商談中", "OB顧客"] },
+        { key: "content", label: "伝えたい内容", type: "textarea", placeholder: "例：今週末の完成見学会、○○市、予約10組限定、プレゼントあり…", full: true },
+      ],
+      buildSystem: () => `あなたはオリズム式集客メソッドを習得した中小工務店のLINE配信担当です。${ORISM_MARKETING_DOCTRINE}
+LINEは短さと親近感が命。読んだ瞬間にタップしたくなる配信文を書いてください。
+
+出力形式：
+【配信文本文】（300字以内、絵文字適度、改行多め）
+【リッチメニュー用タイトル案】（15字以内、2案）
+【タップされやすい時間帯の提案】（平日／週末 でそれぞれ1案）
+【配信後のKPI目安】（開封率・クリック率の想定ベンチマーク）`,
+      buildUserMessage: f => `配信目的：${f.purpose}\n配信対象：${f.segment}\n内容：\n${f.content}`,
+    }
+  },
+  {
+    label: "🎬 YouTube台本",
+    props: {
+      badgeLabel: "YouTube台本",
+      title: "YouTube動画台本生成AI",
+      description: "動画のテーマと尺から、完全な進行台本（導入・本編・CTA）を生成します。",
+      resultLabel: "YouTube動画台本",
+      formFields: [
+        { key: "theme", label: "動画テーマ", placeholder: "例：高気密高断熱の家の冬の実録", full: true },
+        { key: "duration", label: "動画尺", type: "select", options: ["3分（ショート）", "5〜7分（標準）", "10〜15分（じっくり）"] },
+        { key: "target", label: "ターゲット視聴者", placeholder: "例：家づくり検討中の30代夫婦" },
+        { key: "message", label: "伝えたいメッセージ・見どころ", type: "textarea", placeholder: "例：実際の光熱費、体感温度、施主さんのリアル感想…", full: true },
+      ],
+      buildSystem: () => `あなたはオリズム式集客メソッドを習得した中小工務店のYouTube企画担当です。${ORISM_MARKETING_DOCTRINE}
+最後まで視聴されて、来場予約や資料請求につながる台本を書いてください。
+
+出力形式：
+【動画タイトル案】（3案、クリックされるもの）
+【サムネイル用キャッチコピー】（15字以内、3案）
+【導入（フック）】（0:00〜0:30 で離脱させない）
+【本編構成】（時間配分つき、セクションごとに話す内容）
+【クロージング・CTA】（自然な導線で概要欄や来場予約へ）
+【撮影のコツ】（3点、地域工務店でも実行可能なもの）`,
+      buildUserMessage: f => `テーマ：${f.theme}\n動画尺：${f.duration}\nターゲット：${f.target}\n伝えたいメッセージ：\n${f.message}`,
+    }
+  },
+  {
+    label: "🖼️ チラシコピー",
+    props: {
+      badgeLabel: "チラシコピー",
+      title: "チラシ・キャッチコピー生成AI",
+      description: "商品・ターゲットから、ポスティングで反応を取るチラシのキャッチコピーとボディコピーを生成します。",
+      resultLabel: "チラシコピー一式",
+      formFields: [
+        { key: "product", label: "商品・サービス", placeholder: "例：高気密高断熱の注文住宅", full: true },
+        { key: "axis", label: "キャッチコピー軸", type: "select", options: ["光熱費メリット系", "快適性・健康系", "デザイン・憧れ系", "価格・資金系", "安心・実績系"] },
+        { key: "target", label: "読ませたい層", placeholder: "例：築20年以上の戸建にお住まいの40代" },
+        { key: "offer", label: "オファー・キャンペーン（あれば）", placeholder: "例：完成見学会のご案内、先着10組プレゼント", full: true },
+      ],
+      buildSystem: () => `あなたはオリズム式集客メソッドを習得した中小工務店のチラシコピーライターです。${ORISM_MARKETING_DOCTRINE}
+ポスティングで捨てられず読まれるチラシコピーを作ってください。キャッチコピーは一瞬で刺さる言葉で。
+
+出力形式：
+【メインキャッチコピー案】（3案、20字以内）
+【サブキャッチ（キャッチを補足）】（3案、30字以内）
+【ボディコピー本文】（200字程度、読んで悩みに共感させて行動促す）
+【CTA（行動喚起）文言】（見学会予約・資料請求に誘導、2案）
+【チラシレイアウトの提案】（構成ブロックの順番、3〜4段構成）`,
+      buildUserMessage: f => `商品・サービス：${f.product}\nキャッチコピー軸：${f.axis}\n読ませたい層：${f.target}\nオファー：${f.offer}`,
+    }
+  },
+];
+
 function AddCustomerModal({ onAdd, onClose }) {
   const [name, setName] = useState("");
   return (
@@ -697,9 +1043,17 @@ export default function App() {
   const [tab, setTab] = useState(0);
   const [showAddModal, setShowAddModal] = useState(false);
   const [industry, setIndustry] = useState("nikken");
+  const [mode, setMode] = useState("sales");
 
   const selectedCustomer = customers.find(c => c.id === selectedId);
-  const tabs = ["📋 ヒアリングシート", "✉️ メール返信生成", "📈 値上げ説明AI", "🔔 着工遅延お詫び文"];
+  const SALES_TAB_LABELS = ["📋 ヒアリングシート", "✉️ メール返信生成", "📈 値上げ説明AI", "🔔 着工遅延お詫び文"];
+  const tabs = mode === "sales"
+    ? SALES_TAB_LABELS
+    : mode === "consult"
+      ? CONSULT_TABS.map(t => t.label)
+      : MARKETING_TABS.map(t => t.label);
+
+  const changeMode = (m) => { setMode(m); setTab(0); };
 
   const addCustomer = (name) => {
     const newC = { id: Date.now().toString(), name, createdAt: new Date().toLocaleDateString("ja-JP"), hearing: EMPTY_HEARING, members: EMPTY_MEMBERS, emailHistory: [] };
@@ -737,53 +1091,76 @@ export default function App() {
       <div className="app">
         <div className="header">
           <div>
-            <div className="header-logo">O<span className="accent">R</span>ism <span>AI 営業支援システム</span></div>
-            <div className="header-sub">中小工務店のための、地域ナンバーワン営業メソッド搭載 AI</div>
+            <div className="header-logo">O<span className="accent">R</span>ism <span>AI 工務店支援システム</span></div>
+            <div className="header-sub">営業・経営コンサル・集客支援の3モード搭載 — オリズム式メソッド</div>
           </div>
-          <div className="industry-selector">
-            <span className="industry-label">業種</span>
-            <select className="industry-select" value={industry} onChange={e => setIndustry(e.target.value)}>
-              {Object.entries(INDUSTRY_CONFIG).map(([k, v]) => (
-                <option key={k} value={k}>{v.label}</option>
-              ))}
-            </select>
+          <div className="header-right">
+            <div className="mode-selector">
+              <button className={`mode-btn ${mode === "sales" ? "active" : ""}`} onClick={() => changeMode("sales")}>営業支援</button>
+              <button className={`mode-btn ${mode === "consult" ? "active" : ""}`} onClick={() => changeMode("consult")}>経営コンサル</button>
+              <button className={`mode-btn ${mode === "marketing" ? "active" : ""}`} onClick={() => changeMode("marketing")}>集客支援</button>
+            </div>
+            {mode === "sales" && (
+              <div className="industry-selector">
+                <span className="industry-label">業種</span>
+                <select className="industry-select" value={industry} onChange={e => setIndustry(e.target.value)}>
+                  {Object.entries(INDUSTRY_CONFIG).map(([k, v]) => (
+                    <option key={k} value={k}>{v.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
         <div className="layout">
-          <div className="sidebar">
-            <div className="sidebar-title">👥 お客様一覧</div>
-            <button className="add-customer-btn" onClick={() => setShowAddModal(true)}>＋ お客様を追加</button>
-            {customers.map(c => (
-              <div key={c.id} className={`customer-item ${selectedId === c.id ? "active" : ""}`} onClick={() => { setSelectedId(c.id); setTab(0); }}>
-                <div className="customer-item-name">{c.name}</div>
-                <div className="customer-item-meta">{c.emailHistory?.length || 0}往復 · {c.createdAt}</div>
-              </div>
-            ))}
-            {customers.length === 0 && <div style={{fontSize:"11px", color:"#8aaa60", textAlign:"center", marginTop:"20px"}}>お客様を追加してください</div>}
-          </div>
+          {mode === "sales" && (
+            <div className="sidebar">
+              <div className="sidebar-title">👥 お客様一覧</div>
+              <button className="add-customer-btn" onClick={() => setShowAddModal(true)}>＋ お客様を追加</button>
+              {customers.map(c => (
+                <div key={c.id} className={`customer-item ${selectedId === c.id ? "active" : ""}`} onClick={() => { setSelectedId(c.id); setTab(0); }}>
+                  <div className="customer-item-name">{c.name}</div>
+                  <div className="customer-item-meta">{c.emailHistory?.length || 0}往復 · {c.createdAt}</div>
+                </div>
+              ))}
+              {customers.length === 0 && <div style={{fontSize:"11px", color:"#999", textAlign:"center", marginTop:"20px"}}>お客様を追加してください</div>}
+            </div>
+          )}
           <div className="main-area">
-            {!selectedCustomer ? (
-              <div className="no-customer">
-                <div className="no-customer-title">お客様を選択してください</div>
-                <div style={{fontSize:"13px"}}>左のサイドバーからお客様を選ぶか、<br/>新規追加してください</div>
-              </div>
+            {mode === "sales" ? (
+              !selectedCustomer ? (
+                <div className="no-customer">
+                  <div className="no-customer-title">お客様を選択してください</div>
+                  <div style={{fontSize:"13px"}}>左のサイドバーからお客様を選ぶか、<br/>新規追加してください</div>
+                </div>
+              ) : (
+                <>
+                  <div className="tabs">
+                    {tabs.map((t,i) => <button key={i} className={`tab ${tab===i?"active":""}`} onClick={() => setTab(i)}>{t}</button>)}
+                  </div>
+                  <div className="main">
+                    <div className="customer-banner">
+                      <div>
+                        <div className="customer-banner-name">👤 {selectedCustomer.name} 様</div>
+                        <div className="customer-banner-meta">登録日：{selectedCustomer.createdAt} · メール{selectedCustomer.emailHistory?.length || 0}往復</div>
+                      </div>
+                      <button className="customer-banner-del" onClick={() => deleteCustomer(selectedId)}>削除</button>
+                    </div>
+                    {tab === 0 && <HearingTab customer={selectedCustomer} onSave={saveHearing} />}
+                    {tab === 1 && <EmailTab customer={selectedCustomer} onSaveHistory={saveEmailHistory} />}
+                    {tab === 2 && <PriceExplainTab customer={selectedCustomer} industry={industry} />}
+                    {tab === 3 && <DelayApologyTab customer={selectedCustomer} industry={industry} />}
+                  </div>
+                </>
+              )
             ) : (
               <>
                 <div className="tabs">
                   {tabs.map((t,i) => <button key={i} className={`tab ${tab===i?"active":""}`} onClick={() => setTab(i)}>{t}</button>)}
                 </div>
                 <div className="main">
-                  <div className="customer-banner">
-                    <div>
-                      <div className="customer-banner-name">👤 {selectedCustomer.name} 様</div>
-                      <div className="customer-banner-meta">登録日：{selectedCustomer.createdAt} · メール{selectedCustomer.emailHistory?.length || 0}往復</div>
-                    </div>
-                    <button className="customer-banner-del" onClick={() => deleteCustomer(selectedId)}>削除</button>
-                  </div>
-                  {tab === 0 && <HearingTab customer={selectedCustomer} onSave={saveHearing} />}
-                  {tab === 1 && <EmailTab customer={selectedCustomer} onSaveHistory={saveEmailHistory} />}
-                  {tab === 2 && <PriceExplainTab customer={selectedCustomer} industry={industry} />}
-                  {tab === 3 && <DelayApologyTab customer={selectedCustomer} industry={industry} />}
+                  {mode === "consult" && CONSULT_TABS[tab] && <GenericAITab key={`consult-${tab}`} {...CONSULT_TABS[tab].props} />}
+                  {mode === "marketing" && MARKETING_TABS[tab] && <GenericAITab key={`marketing-${tab}`} {...MARKETING_TABS[tab].props} />}
                 </div>
               </>
             )}
