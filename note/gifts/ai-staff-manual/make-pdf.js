@@ -72,7 +72,7 @@ function renderTable(lines) {
       let html = inline(c);
       // 振り返り表：「行」「個」は数字を書き込む単位、「Ａ・Ｂ・Ｃ」は○で囲む選択肢として組む
       if (kind.includes('tpl-review') && i === 1) {
-        if (/^(行|個)$/.test(c)) html = `<span class="unit">${esc(c)}</span>`;
+        if (/^(行|個|件)$/.test(c)) html = `<span class="unit">${esc(c)}</span>`;
         else if (c.includes('・')) html = `<span class="choices">${c.split('・').map((x) => `<span>${esc(x)}</span>`).join('<i>・</i>')}</span>`;
       }
       // ルールシートの①②③は1行ずつ書ける高さにする
