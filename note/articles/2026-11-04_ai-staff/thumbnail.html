@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>見出し画像：AI社員10人 何が楽になる？</title>
+<!-- フォント：Google Fonts「Noto Sans JP」（SIL Open Font License）。読み込めない場合はローカルの日本語ゴシックで表示 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700;900&display=block" rel="stylesheet">
+<style>
+  /* シリーズ配色（3色）：背景＝藍／文字＝生成り／差し色＝山吹 */
+  :root {
+    --bg: #17324D;
+    --text: #FAF6EE;
+    --accent: #F2A93B;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1280px; height: 670px; overflow: hidden; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "Meiryo", "IPAPGothic", "IPAGothic", sans-serif;
+    font-feature-settings: "palt";
+  }
+  /* 安全域：上下左右80pxの内側（1120×510）にすべての文字を置く */
+  .safe {
+    position: absolute;
+    left: 80px; top: 80px;
+    width: 1120px; height: 510px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+  .tag {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--bg);
+    background: var(--accent);
+    padding: 6px 26px 8px;
+    border-radius: 999px;
+    margin-bottom: 30px;
+  }
+  .line1 {
+    font-size: 108px;
+    font-weight: 900;
+    line-height: 1.15;
+    color: var(--accent);
+    letter-spacing: 0.02em;
+  }
+  .line2 {
+    font-size: 150px;
+    font-weight: 900;
+    line-height: 1.15;
+    color: var(--text);
+    letter-spacing: 0.02em;
+  }
+  /* 10人＝10個の丸（人物写真・イラストの代わりの抽象表現） */
+  .dots {
+    display: flex;
+    gap: 18px;
+    margin-top: 34px;
+  }
+  .dots span {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+</style>
+</head>
+<body>
+  <div class="safe">
+    <div class="tag">AIの使い方</div>
+    <div class="line1">AI社員10人</div>
+    <div class="line2">何が楽になる？</div>
+    <div class="dots" aria-hidden="true">
+      <span></span><span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+  </div>
+</body>
+</html>
