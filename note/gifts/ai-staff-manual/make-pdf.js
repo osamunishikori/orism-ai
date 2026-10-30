@@ -1,10 +1,14 @@
-// LINE特典「工務店向け AI社員の作り方マニュアル」を manual.md から作る。
-//   1) manual.md（「# 書き手メモ（PDFに入れない）」より前だけ）→ manual.html
-//   2) manual.html → manual.pdf（A4縦・余白あり・ページ番号あり。Playwright＋Chromium）
-// 使い方：node make-pdf.js            （html と pdf の両方を作り直す）
-//         node make-pdf.js --html-only （html だけ作る）
-// 配色：藍 #17324D・生成り #FAF6EE・山吹 #F2A93B（記事の見出し画像と同じ）。本文ページは白地に藍の文字。
-// フォント：Google Fonts「Noto Sans JP」（SIL Open Font License）。読めないときはローカルの日本語ゴシック。
+// LINE特典「工務店向け AI社員の作り方マニュアル」のPDFを作る。2つの版がある。
+//   A4版（印刷したい人向け）：manual.md → manual.html → manual.pdf（A4縦・余白あり・ページ番号あり）
+//   スマホ版（LINEで受け取って読む）：manual-sp.md → manual-sp.html → manual-sp.pdf（横390×縦844pxの縦長ページ）
+//   どちらも「# 書き手メモ（PDFに入れない）」より前だけを使う。書き出しは Playwright＋Chromium。
+// 使い方：node make-pdf.js              （A4版の html と pdf を作り直す）
+//         node make-pdf.js sp           （スマホ版の html と pdf を作り直す）
+//         node make-pdf.js all          （両方）
+//         --html-only を足すと html だけ作る（例：node make-pdf.js sp --html-only）
+// A4版の配色：藍 #17324D・生成り #FAF6EE・山吹 #F2A93B。本文ページは白地に藍の文字。
+// スマホ版の配色：記事の見出し画像（工事黒板）とそろえる。黒板 #23453a・チョーク #f1efe4・白地に濃い文字。
+// フォント：Google Fonts「Noto Sans JP」「Klee One」（どちらも SIL Open Font License）。読めないときはローカルの日本語フォント。
 
 const fs = require('fs');
 const path = require('path');
@@ -393,7 +397,379 @@ async function toPdf() {
   console.log('wrote', PDF);
 }
 
-build();
-if (!process.argv.includes('--html-only')) {
-  toPdf().catch((e) => { console.error(e); process.exit(1); });
+// =====================================================================
+// スマホ版（manual-sp.md → manual-sp.html → manual-sp.pdf）
+//   ページ：横390×縦844px（スマホ1画面の幅）。Googleドライブ等のPDF表示で、ページ幅＝画面幅で読む前提。
+//   改ページ：表紙のあと／「## 1.」のような番号つきの見出し（章の始まり）の前だけ。それ以外の ## は流し込む。
+//   見出し・ひな形の枠（>）・太字の小見出し＋直後の箇条書きは、ページの途中で切らない。
+// =====================================================================
+
+const SRC_SP = path.join(DIR, 'manual-sp.md');
+const HTML_SP = path.join(DIR, 'manual-sp.html');
+const PDF_SP = path.join(DIR, 'manual-sp.pdf');
+
+// ひな形の1行：「項目：」の項目を太字に、（ ）の中（書き換える所）に下線
+function spQuoteLine(t, isTemplate) {
+  let label = '';
+  let rest = t;
+  const m = t.match(/^([^（「：][^「：]{0,24})：(.*)$/);
+  if (m) { label = `<b class="k">${esc(m[1])}：</b>`; rest = m[2]; }
+  let h = inline(rest);
+  if (isTemplate) h = h.replace(/（([^（）]*)）/g, '<span class="fill">（$1）</span>');
+  return label + h;
 }
+
+// 「>」が続く行：1行ずつ別の行として組み、枠で囲む（コピーして使うもの）
+//   1行だけ → 補足の囲み／1行目が【N】→ 枠の見出し帯にする／見出しに「記入例」→ 点線の枠（書き換える所の下線なし）
+function renderQuoteSp(lines, h2text) {
+  let texts = lines.map((l) => l.replace(/^>\s?/, ''));
+  if (texts.length === 1) return `<div class="note-box"><p>${inline(texts[0])}</p></div>\n`;
+  const isExample = /記入例/.test(h2text || '') || texts[0].startsWith('記入例');
+  let head = '';
+  if (/^【\d】/.test(texts[0])) { head = `<div class="copy-head">${inline(texts[0])}</div>\n`; texts = texts.slice(1); }
+  const body = texts.map((t) => {
+    if (t.trim() === '') return '<div class="qgap"></div>';
+    if (t.startsWith('記入例')) return `<div class="qline ex-label">${inline(t)}</div>`;
+    const sep = t.startsWith('――') ? ' sep' : '';
+    return `<div class="qline${sep}">${spQuoteLine(t, !isExample)}</div>`;
+  }).join('\n');
+  return `<div class="copy-box${isExample ? ' example' : ''}">\n${head}<div class="copy-body">\n${body}\n</div>\n</div>\n`;
+}
+
+function renderBlocksSp(lines) {
+  let out = '';
+  let i = 0;
+  // 見出し（##）や太字だけの小見出しは、次のかたまりと一緒に .keep で包む（ページ末に見出しだけ残さない）
+  let pending = '';
+  let h2text = '';
+  const glue = (html) => { pending += html; };
+  //   枠（ひな形）は途中で切れないので、見出しと枠を丸ごと .keep で包む。
+  //   段落・箇条書きは途中で切れてよい（見出しは break-after: avoid で次の行とくっつく）。ページ末の空きを減らすため
+  const emit = (html, whole) => {
+    if (pending && whole) out += `<div class="keep">\n${pending}${html}</div>\n`;
+    else out += pending + html;
+    pending = '';
+  };
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.trim() === '') { i++; continue; }
+    if (line.startsWith('## ')) {
+      if (pending) { out += pending; pending = ''; }
+      h2text = line.slice(3);
+      glue(`<h2>${inline(h2text)}</h2>\n`);
+      i++; continue;
+    }
+    if (line.startsWith('>')) {
+      const ql = [];
+      while (i < lines.length && lines[i].startsWith('>')) ql.push(lines[i++]);
+      emit(renderQuoteSp(ql, h2text), true); continue;
+    }
+    if (/^\d+\.\s/.test(line)) {
+      let html = '<ol>\n';
+      while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
+        const first = lines[i].replace(/^\d+\.\s/, '');
+        i++;
+        const cont = [];
+        while (i < lines.length && /^\s{2,}\S/.test(lines[i])) cont.push(lines[i++].trim());
+        html += `<li>${inline(first)}${cont.length ? `<br>${inline(cont.join(''))}` : ''}</li>\n`;
+      }
+      html += '</ol>\n';
+      emit(html); continue;
+    }
+    if (line.startsWith('- ')) {
+      let html = '<ul>\n';
+      let n = 0;
+      while (i < lines.length && lines[i].startsWith('- ')) { html += `<li>${inline(lines[i++].slice(2))}</li>\n`; n++; }
+      html += '</ul>\n';
+      emit(html, n <= 3); continue; // 3項目までの短い箇条書きは、見出しごと次のページへ送る
+    }
+    // 段落（空行まで。行が続くときは改行を保つ）
+    const pl = [];
+    while (i < lines.length && lines[i].trim() !== '' && !/^(#|\||>|- |\d+\.\s)/.test(lines[i])) pl.push(lines[i++]);
+    const boldOnly = /^\*\*[^*]+\*\*$/.test(pl[0].trim());
+    if (boldOnly && pl.length === 1 && i < lines.length && lines[i].startsWith('- ')) {
+      // 「**最低これだけ**」＋箇条書き → 小見出しとして次の箇条書きとくっつける
+      glue(`<p class="sub-ttl">${inline(pl[0])}</p>\n`);
+      continue;
+    }
+    if (boldOnly && pl.length === 1) {
+      // 太字だけの一文（「作業がゼロに…」）は、直前の段落（「今の私の答えは、こうです。」）と同じページに置く
+      const prev = out.match(/<p>[^\n]*<\/p>\n$/);
+      const st = `<p class="statement">${inline(pl[0])}</p>\n`;
+      if (prev && !pending) { out = out.slice(0, prev.index) + `<div class="keep">\n${prev[0]}${st}</div>\n`; }
+      else emit(st);
+      continue;
+    }
+    if (boldOnly) {
+      // 「**1. 社長が毎回…**」＋説明 → 小見出しつきの段落（途中で切らない）
+      emit(`<p class="item"><span class="sub-ttl">${inline(pl[0])}</span>${pl.slice(1).map(inline).join('<br>')}</p>\n`);
+      continue;
+    }
+    // 短い段落（約5行まで）は途中で切らない。最後の1行だけが次のページに出るのを防ぐ（Chromium の印刷では widows が効かないため）
+    const len = pl.join('').replace(/\*\*/g, '').length;
+    emit(len <= 100 ? `<p class="short">${pl.map(inline).join('<br>')}</p>\n` : `<p>${pl.map(inline).join('<br>')}</p>\n`);
+  }
+  if (pending) out += pending;
+  return out;
+}
+
+function buildSp() {
+  const md = fs.readFileSync(SRC_SP, 'utf8').replace(/\r\n/g, '\n');
+  const cut = md.indexOf('\n# 書き手メモ（PDFに入れない）');
+  if (cut < 0) throw new Error('「# 書き手メモ（PDFに入れない）」が見つかりません');
+  const lines = md.slice(0, cut).replace(/\n---\s*$/, '').split('\n');
+
+  // 表紙（最初の ## まで）
+  const firstH2 = lines.findIndex((l) => l.startsWith('## '));
+  const cl = lines.slice(0, firstH2).filter((l) => l.trim() !== '');
+  const title = cl[0].replace(/^#\s+/, '');
+  const sub = cl[1];
+  const author = cl[2];
+  const lead = cl.filter((l) => l.startsWith('>')).map((l) => l.replace(/^>\s?/, '')).join('');
+  const m = title.match(/^(工務店向け)\s*(AI社員の作り方)(マニュアル)$/);
+  let html = `<section class="cover">
+  <div class="board">
+    <div class="smudge"></div>
+    <div class="frame">
+      <div class="row row-top">${m ? `<span class="t-small">${esc(m[1])}</span>` : ''}</div>
+      <div class="row row-main">
+        <h1 class="cover-title">${m ? `<span class="t-big">${esc(m[2])}</span><span class="t-big">${esc(m[3])}</span>` : esc(title)}</h1>
+        <p class="cover-sub">${inline(sub).replace('、', '、<br>')}</p>
+      </div>
+      <div class="row row-lead"><p>${inline(lead)}</p></div>
+      <div class="row row-author"><p>${inline(author)}</p></div>
+    </div>
+    <div class="tray"></div>
+    <div class="stick" style="left: 236px; width: 44px;"></div>
+    <div class="stick" style="left: 290px; width: 28px; background: #e9d9a0;"></div>
+  </div>
+</section>
+`;
+
+  // 本文：「## 1.」のような番号つき見出しの前で改ページ
+  const groups = [];
+  let cur = { head: null, lines: [] };
+  lines.slice(firstH2).forEach((l) => {
+    const mm = l.match(/^##\s+(\d+)\.\s*(.+)$/);
+    if (mm) { groups.push(cur); cur = { head: { num: mm[1], ttl: mm[2] }, lines: [] }; }
+    else cur.lines.push(l);
+  });
+  groups.push(cur);
+  groups.forEach((g) => {
+    if (!g.head && g.lines.every((l) => l.trim() === '')) return;
+    const head = g.head
+      ? `<h1 class="chap"><span class="num">${esc(g.head.num)}</span><span class="ttl">${inline(g.head.ttl)}</span></h1>\n`
+      : '';
+    html += `<section class="${g.head ? 'chapter' : 'intro'}">\n${head}${renderBlocksSp(g.lines)}</section>\n`;
+  });
+
+  const doc = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390">
+<title>${esc(title)}</title>
+<!-- このファイルは make-pdf.js が manual-sp.md から作っています。文章の直しは manual-sp.md で行い、node make-pdf.js sp で作り直してください -->
+<!-- フォント：Google Fonts「Noto Sans JP」「Klee One」（SIL Open Font License）。読み込めない場合はローカルの日本語フォントで表示 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Klee+One:wght@400;600&family=Noto+Sans+JP:wght@400;700&display=block" rel="stylesheet">
+<style>
+${CSS_SP}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="grain">
+    <feTurbulence type="fractalNoise" baseFrequency="0.012 0.05" numOctaves="3" seed="11"/>
+    <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .09 0"/>
+  </filter>
+</svg>
+${html}</body>
+</html>
+`;
+  fs.writeFileSync(HTML_SP, doc);
+  console.log('wrote', HTML_SP);
+}
+
+const CSS_SP = `
+  /* 配色（記事の見出し画像＝工事黒板とそろえる）：黒板の緑＝表紙・章見出し・差し色／チョーク＝表紙の文字・枠の地／本文＝白地に濃い文字 */
+  :root {
+    --board: #23453a;
+    --chalk: #f1efe4;
+    --chalk-dim: rgba(241, 239, 228, 0.62);
+    --ink: #1f2a26;
+    --line: rgba(35, 69, 58, 0.55);
+    --line-soft: rgba(35, 69, 58, 0.22);
+    --sans: "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "YuGothic", "Meiryo", "IPAexGothic", "IPAGothic", sans-serif;
+    --klee: "Klee One", "Hiragino Maru Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
+  }
+  @page {
+    size: 390px 844px;
+    margin: 26px 20px 36px 20px;
+    @bottom-center {
+      content: counter(page) " / " counter(pages);
+      font-family: "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", "IPAGothic", sans-serif;
+      font-size: 11px;
+      color: rgba(35, 69, 58, 0.75);
+    }
+  }
+  @page :first {
+    margin: 0;
+    @bottom-center { content: none; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--sans);
+    color: var(--ink);
+    background: #fff;
+    font-size: 17px;
+    line-height: 1.72;
+    overflow-wrap: anywhere;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  strong, b { font-weight: 700; }
+
+  /* ---------- 表紙（工事黒板） ---------- */
+  .cover { width: 390px; height: 844px; break-after: page; overflow: hidden; }
+  .board {
+    position: relative; width: 100%; height: 100%;
+    background:
+      radial-gradient(ellipse at 30% 35%, rgba(255,255,255,.06), transparent 60%),
+      radial-gradient(ellipse at 80% 85%, rgba(255,255,255,.05), transparent 55%),
+      var(--board);
+    color: var(--chalk);
+    font-family: var(--klee);
+    overflow: hidden;
+  }
+  .smudge { position: absolute; inset: 0; filter: url(#grain); opacity: .5; }
+  .frame {
+    position: absolute; left: 22px; right: 22px; top: 40px; bottom: 58px;
+    border: 2.5px solid var(--chalk-dim);
+    display: flex; flex-direction: column;
+  }
+  .row { padding: 0 20px; }
+  .row-top { border-bottom: 2.5px solid var(--chalk-dim); padding-top: 14px; padding-bottom: 12px; }
+  .row-top .t-small { font-size: 22px; font-weight: 600; letter-spacing: .12em; }
+  .row-main { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+  .cover-title { margin: 0; font-weight: 600; line-height: 1.32; letter-spacing: .02em; -webkit-text-stroke: .6px var(--chalk); }
+  .cover-title .t-big { display: block; font-size: 40px; }
+  .cover-sub { margin: 22px 0 0; font-size: 19px; font-weight: 600; line-height: 1.6; color: var(--chalk); }
+  .cover-sub::before { content: ""; display: block; width: 56px; height: 3px; background: var(--chalk-dim); margin-bottom: 18px; }
+  .row-lead { border-top: 2.5px solid var(--chalk-dim); padding-top: 18px; padding-bottom: 20px; }
+  .row-lead p { margin: 0; font-size: 16.5px; line-height: 1.85; }
+  .row-author { border-top: 2.5px solid var(--chalk-dim); padding-top: 14px; padding-bottom: 14px; }
+  .row-author p { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: .06em; }
+  .tray { position: absolute; left: 0; right: 0; bottom: 0; height: 14px; background: linear-gradient(#7d827b, #a7aba5); }
+  .stick { position: absolute; bottom: 9px; height: 9px; border-radius: 3px; background: var(--chalk); }
+
+  /* ---------- 章（番号つきの見出しの前だけ改ページ） ---------- */
+  .chapter { break-before: page; }
+  h1.chap {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 0 18px; padding: 12px 16px;
+    background: var(--board); color: var(--chalk);
+    border-radius: 6px;
+    font-family: var(--klee); font-weight: 600;
+    font-size: 23px; line-height: 1.4;
+    break-after: avoid;
+  }
+  h1.chap .num {
+    flex: none; font-size: 34px; line-height: 1;
+    padding-right: 14px; border-right: 2.5px solid var(--chalk-dim);
+  }
+  h2 {
+    margin: 26px 0 8px; padding: 1px 0 1px 11px;
+    border-left: 5px solid var(--board);
+    color: var(--board);
+    font-size: 20px; font-weight: 700; line-height: 1.45;
+    break-after: avoid;
+  }
+  .intro > h2:first-child, .intro > .keep:first-child > h2:first-child { margin-top: 4px; }
+  h1.chap + h2, h1.chap + .keep > h2:first-child { margin-top: 6px; }
+  .keep { break-inside: avoid; }
+  p { margin: 0 0 12px; orphans: 2; widows: 2; }
+  .sub-ttl { display: block; margin: 0 0 2px; font-weight: 700; color: var(--board); }
+  p.sub-ttl { margin-top: 4px; break-after: avoid; }
+  p.item, p.short { break-inside: avoid; }
+  p.statement {
+    margin: 4px 0 18px; padding: 12px 14px;
+    border-left: 5px solid var(--board); background: var(--chalk);
+    font-weight: 700; line-height: 1.75;
+  }
+
+  ul, ol { margin: 0 0 12px; padding: 0; list-style: none; }
+  li { position: relative; margin: 0 0 4px; break-inside: avoid; }
+  ul li { padding-left: 18px; }
+  ul li::before { content: ""; position: absolute; left: 3px; top: .72em; width: 7px; height: 7px; border-radius: 50%; background: var(--board); }
+  ol { counter-reset: n; }
+  ol li { counter-increment: n; padding-left: 34px; }
+  ol li::before {
+    content: counter(n); position: absolute; left: 0; top: .2em;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--board); color: var(--chalk);
+    font-size: 14px; font-weight: 700; line-height: 24px; text-align: center;
+  }
+
+  /* 補足（> 1行） */
+  .note-box { margin: 4px 0 16px; padding: 12px 14px; background: var(--chalk); border-radius: 6px; break-inside: avoid; font-size: 16px; line-height: 1.75; }
+  .note-box p { margin: 0; }
+
+  /* ひな形・記入例（> が続く行）：枠で囲み、1行ずつ改行を保つ。折り返した行は1字下げて、元の行と見分ける */
+  .copy-box {
+    margin: 6px 0 16px;
+    border: 2px solid var(--board); border-radius: 8px;
+    background: var(--chalk);
+    overflow: hidden;
+    break-inside: avoid;
+  }
+  .copy-head {
+    padding: 8px 12px;
+    background: var(--board); color: var(--chalk);
+    font-size: 15.5px; font-weight: 700; line-height: 1.5;
+  }
+  .copy-body { padding: 4px 12px 6px; font-size: 16.5px; line-height: 1.6; }
+  .qline { padding: 5px 0 5px 1em; text-indent: -1em; border-bottom: 1px dashed var(--line-soft); }
+  .qline:last-child { border-bottom: none; }
+  .qline .k { color: var(--board); }
+  .qline.sep { font-weight: 700; color: var(--board); text-indent: 0; padding-left: 0; }
+  .qline.ex-label { font-weight: 700; color: var(--board); font-size: 14.5px; }
+  .qgap { height: 10px; border-bottom: 2px solid var(--line); margin-bottom: 4px; }
+  .fill { text-decoration: underline; text-decoration-color: var(--board); text-decoration-thickness: 1.5px; text-underline-offset: 4px; }
+  .copy-box.example { background: #fff; border-style: dashed; }
+`;
+
+async function toPdfSp() {
+  const { chromium } = require('playwright');
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await page.goto('file://' + HTML_SP, { waitUntil: 'networkidle' });
+  await page.evaluate(() => document.fonts.ready);
+  const fonts = await page.evaluate(() => ({
+    noto: document.fonts.check('17px "Noto Sans JP"', 'あ'),
+    klee: document.fonts.check('600 23px "Klee One"', 'あ'),
+  }));
+  console.log('Noto Sans JP loaded:', fonts.noto, '/ Klee One loaded:', fonts.klee);
+  await page.emulateMedia({ media: 'print' });
+  await page.pdf({ path: PDF_SP, preferCSSPageSize: true, printBackground: true });
+  await browser.close();
+  console.log('wrote', PDF_SP);
+}
+
+// ---------- 実行 ----------
+const args = process.argv.slice(2);
+const htmlOnly = args.includes('--html-only');
+const mode = args.includes('all') ? 'all' : args.includes('sp') ? 'sp' : 'a4';
+
+(async () => {
+  if (mode === 'a4' || mode === 'all') {
+    build();
+    if (!htmlOnly) await toPdf();
+  }
+  if (mode === 'sp' || mode === 'all') {
+    buildSp();
+    if (!htmlOnly) await toPdfSp();
+  }
+})().catch((e) => { console.error(e); process.exit(1); });

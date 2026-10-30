@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390">
+<title>工務店向け AI社員の作り方マニュアル</title>
+<!-- このファイルは make-pdf.js が manual-sp.md から作っています。文章の直しは manual-sp.md で行い、node make-pdf.js sp で作り直してください -->
+<!-- フォント：Google Fonts「Noto Sans JP」「Klee One」（SIL Open Font License）。読み込めない場合はローカルの日本語フォントで表示 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Klee+One:wght@400;600&family=Noto+Sans+JP:wght@400;700&display=block" rel="stylesheet">
+<style>
+
+  /* 配色（記事の見出し画像＝工事黒板とそろえる）：黒板の緑＝表紙・章見出し・差し色／チョーク＝表紙の文字・枠の地／本文＝白地に濃い文字 */
+  :root {
+    --board: #23453a;
+    --chalk: #f1efe4;
+    --chalk-dim: rgba(241, 239, 228, 0.62);
+    --ink: #1f2a26;
+    --line: rgba(35, 69, 58, 0.55);
+    --line-soft: rgba(35, 69, 58, 0.22);
+    --sans: "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "YuGothic", "Meiryo", "IPAexGothic", "IPAGothic", sans-serif;
+    --klee: "Klee One", "Hiragino Maru Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
+  }
+  @page {
+    size: 390px 844px;
+    margin: 26px 20px 36px 20px;
+    @bottom-center {
+      content: counter(page) " / " counter(pages);
+      font-family: "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", "IPAGothic", sans-serif;
+      font-size: 11px;
+      color: rgba(35, 69, 58, 0.75);
+    }
+  }
+  @page :first {
+    margin: 0;
+    @bottom-center { content: none; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--sans);
+    color: var(--ink);
+    background: #fff;
+    font-size: 17px;
+    line-height: 1.72;
+    overflow-wrap: anywhere;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  strong, b { font-weight: 700; }
+
+  /* ---------- 表紙（工事黒板） ---------- */
+  .cover { width: 390px; height: 844px; break-after: page; overflow: hidden; }
+  .board {
+    position: relative; width: 100%; height: 100%;
+    background:
+      radial-gradient(ellipse at 30% 35%, rgba(255,255,255,.06), transparent 60%),
+      radial-gradient(ellipse at 80% 85%, rgba(255,255,255,.05), transparent 55%),
+      var(--board);
+    color: var(--chalk);
+    font-family: var(--klee);
+    overflow: hidden;
+  }
+  .smudge { position: absolute; inset: 0; filter: url(#grain); opacity: .5; }
+  .frame {
+    position: absolute; left: 22px; right: 22px; top: 40px; bottom: 58px;
+    border: 2.5px solid var(--chalk-dim);
+    display: flex; flex-direction: column;
+  }
+  .row { padding: 0 20px; }
+  .row-top { border-bottom: 2.5px solid var(--chalk-dim); padding-top: 14px; padding-bottom: 12px; }
+  .row-top .t-small { font-size: 22px; font-weight: 600; letter-spacing: .12em; }
+  .row-main { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+  .cover-title { margin: 0; font-weight: 600; line-height: 1.32; letter-spacing: .02em; -webkit-text-stroke: .6px var(--chalk); }
+  .cover-title .t-big { display: block; font-size: 40px; }
+  .cover-sub { margin: 22px 0 0; font-size: 19px; font-weight: 600; line-height: 1.6; color: var(--chalk); }
+  .cover-sub::before { content: ""; display: block; width: 56px; height: 3px; background: var(--chalk-dim); margin-bottom: 18px; }
+  .row-lead { border-top: 2.5px solid var(--chalk-dim); padding-top: 18px; padding-bottom: 20px; }
+  .row-lead p { margin: 0; font-size: 16.5px; line-height: 1.85; }
+  .row-author { border-top: 2.5px solid var(--chalk-dim); padding-top: 14px; padding-bottom: 14px; }
+  .row-author p { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: .06em; }
+  .tray { position: absolute; left: 0; right: 0; bottom: 0; height: 14px; background: linear-gradient(#7d827b, #a7aba5); }
+  .stick { position: absolute; bottom: 9px; height: 9px; border-radius: 3px; background: var(--chalk); }
+
+  /* ---------- 章（番号つきの見出しの前だけ改ページ） ---------- */
+  .chapter { break-before: page; }
+  h1.chap {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 0 18px; padding: 12px 16px;
+    background: var(--board); color: var(--chalk);
+    border-radius: 6px;
+    font-family: var(--klee); font-weight: 600;
+    font-size: 23px; line-height: 1.4;
+    break-after: avoid;
+  }
+  h1.chap .num {
+    flex: none; font-size: 34px; line-height: 1;
+    padding-right: 14px; border-right: 2.5px solid var(--chalk-dim);
+  }
+  h2 {
+    margin: 26px 0 8px; padding: 1px 0 1px 11px;
+    border-left: 5px solid var(--board);
+    color: var(--board);
+    font-size: 20px; font-weight: 700; line-height: 1.45;
+    break-after: avoid;
+  }
+  .intro > h2:first-child, .intro > .keep:first-child > h2:first-child { margin-top: 4px; }
+  h1.chap + h2, h1.chap + .keep > h2:first-child { margin-top: 6px; }
+  .keep { break-inside: avoid; }
+  p { margin: 0 0 12px; orphans: 2; widows: 2; }
+  .sub-ttl { display: block; margin: 0 0 2px; font-weight: 700; color: var(--board); }
+  p.sub-ttl { margin-top: 4px; break-after: avoid; }
+  p.item, p.short { break-inside: avoid; }
+  p.statement {
+    margin: 4px 0 18px; padding: 12px 14px;
+    border-left: 5px solid var(--board); background: var(--chalk);
+    font-weight: 700; line-height: 1.75;
+  }
+
+  ul, ol { margin: 0 0 12px; padding: 0; list-style: none; }
+  li { position: relative; margin: 0 0 4px; break-inside: avoid; }
+  ul li { padding-left: 18px; }
+  ul li::before { content: ""; position: absolute; left: 3px; top: .72em; width: 7px; height: 7px; border-radius: 50%; background: var(--board); }
+  ol { counter-reset: n; }
+  ol li { counter-increment: n; padding-left: 34px; }
+  ol li::before {
+    content: counter(n); position: absolute; left: 0; top: .2em;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--board); color: var(--chalk);
+    font-size: 14px; font-weight: 700; line-height: 24px; text-align: center;
+  }
+
+  /* 補足（> 1行） */
+  .note-box { margin: 4px 0 16px; padding: 12px 14px; background: var(--chalk); border-radius: 6px; break-inside: avoid; font-size: 16px; line-height: 1.75; }
+  .note-box p { margin: 0; }
+
+  /* ひな形・記入例（> が続く行）：枠で囲み、1行ずつ改行を保つ。折り返した行は1字下げて、元の行と見分ける */
+  .copy-box {
+    margin: 6px 0 16px;
+    border: 2px solid var(--board); border-radius: 8px;
+    background: var(--chalk);
+    overflow: hidden;
+    break-inside: avoid;
+  }
+  .copy-head {
+    padding: 8px 12px;
+    background: var(--board); color: var(--chalk);
+    font-size: 15.5px; font-weight: 700; line-height: 1.5;
+  }
+  .copy-body { padding: 4px 12px 6px; font-size: 16.5px; line-height: 1.6; }
+  .qline { padding: 5px 0 5px 1em; text-indent: -1em; border-bottom: 1px dashed var(--line-soft); }
+  .qline:last-child { border-bottom: none; }
+  .qline .k { color: var(--board); }
+  .qline.sep { font-weight: 700; color: var(--board); text-indent: 0; padding-left: 0; }
+  .qline.ex-label { font-weight: 700; color: var(--board); font-size: 14.5px; }
+  .qgap { height: 10px; border-bottom: 2px solid var(--line); margin-bottom: 4px; }
+  .fill { text-decoration: underline; text-decoration-color: var(--board); text-decoration-thickness: 1.5px; text-underline-offset: 4px; }
+  .copy-box.example { background: #fff; border-style: dashed; }
+
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="grain">
+    <feTurbulence type="fractalNoise" baseFrequency="0.012 0.05" numOctaves="3" seed="11"/>
+    <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .09 0"/>
+  </filter>
+</svg>
+<section class="cover">
+  <div class="board">
+    <div class="smudge"></div>
+    <div class="frame">
+      <div class="row row-top"><span class="t-small">工務店向け</span></div>
+      <div class="row row-main">
+        <h1 class="cover-title"><span class="t-big">AI社員の作り方</span><span class="t-big">マニュアル</span></h1>
+        <p class="cover-sub">担当1人から始める、<br>1か月の進め方</p>
+      </div>
+      <div class="row row-lead"><p>このマニュアルは、御社で最初のAI社員を1人決めて、1か月一緒に仕事をしてみるための手引きです。</p></div>
+      <div class="row row-author"><p>株式会社オリズム　錦織 修</p></div>
+    </div>
+    <div class="tray"></div>
+    <div class="stick" style="left: 236px; width: 44px;"></div>
+    <div class="stick" style="left: 290px; width: 28px; background: #e9d9a0;"></div>
+  </div>
+</section>
+<section class="intro">
+<h2>はじめに</h2>
+<p class="short">こんにちは、錦織です。noteを読んで、LINEに登録してくださってありがとうございます。</p>
+<p class="short">このマニュアルは、記事の最後に書いた「最初の一歩」の続きです。あの3つの一歩を、手を動かせる形にしました。</p>
+<div class="keep">
+<h2>記事のおさらい</h2>
+<ul>
+<li><strong>AI社員</strong>とは、担当とルールを決めて仕事を任せるAIのことです。</li>
+<li>作り方は、新人の育て方と同じです。担当を決めて、ルールを渡して、注意したことを覚えてもらいます。</li>
+<li>いきなり何人もいりません。まずは1人からです。</li>
+</ul>
+</div>
+<h2>このマニュアルでやること</h2>
+<ol>
+<li>最初の1人に任せる仕事を選ぶ（仕事選びのメモ）</li>
+<li>担当を決める（担当表）</li>
+<li>ルールを1つにまとめる（ルールシート）</li>
+<li>直したところを貯める（直しメモ）</li>
+<li>AIにやらせないことを決める</li>
+<li>1か月、週ごとに進める（振り返りメモ）</li>
+</ol>
+<h2>基本の流れは3つです</h2>
+<ol>
+<li>スマホのメモアプリに書く</li>
+<li>全部コピーする</li>
+<li>AIのアプリに貼って送る</li>
+</ol>
+<p class="short">このマニュアルで作るものは、全部メモアプリに書きます。AIに貼るのは、そのうちの1つのメモだけです。残りは、社長が自分で見るためのメモです。</p>
+<h2>用意するもの</h2>
+<ul>
+<li><strong>スマホ。</strong> このマニュアルを読んでいるスマホで大丈夫です。</li>
+<li><strong>メモアプリ。</strong> ふだん使っているもので大丈夫です。</li>
+<li><strong>Claude（クロード）のようなAIのアプリ。</strong> 費用は月数千円からです。料金は変わることがあるので、申し込む前に公式の料金ページで確かめてください。</li>
+<li><strong>直す時間。</strong> ここは社長から出ます。</li>
+</ul>
+<p class="short">メモアプリとAIのアプリが同じスマホに入っていれば、メモからそのままコピーして貼れます。</p>
+<h2>埋まらない項目があっても大丈夫です</h2>
+<p class="short">メモに書く項目は、全部埋まらなくても大丈夫です。埋まらない項目があれば、それは「まだ言葉になっていないこと」が見つかったということです。</p>
+<p class="short">そこが、この1か月でいちばんの収穫になるかもわからないですね。</p>
+</section>
+<section class="chapter">
+<h1 class="chap"><span class="num">1</span><span class="ttl">最初の1人に任せる仕事を選ぶ</span></h1>
+<p class="short">最初の1人に何を任せるかで、続けやすさがだいぶ変わります。</p>
+<p class="short">迷ったら、次の5つの基準で考えてみてください。</p>
+<ol>
+<li>社長が毎回手を入れている仕事</li>
+<li>文章で終わる仕事</li>
+<li>くり返し出てくる仕事</li>
+<li>お客さんの名前・金額・住所・電話番号がなくても下書きできる仕事</li>
+<li>間違っても、出す前に社長が止められる仕事</li>
+</ol>
+<h2>基準1〜3</h2>
+<p class="item"><span class="sub-ttl"><strong>1. 社長が毎回手を入れている仕事</strong></span>社員さんが書いたものを、結局社長が直している。そういう仕事には、社長の考え方がいちばん表に出ます。AIに渡す材料も、社長の頭の中にあります。</p>
+<p class="item"><span class="sub-ttl"><strong>2. 文章で終わる仕事</strong></span>AIが作るのは下書きまで。出すのは人、と線を引きやすい仕事が向いています。</p>
+<p class="item"><span class="sub-ttl"><strong>3. くり返し出てくる仕事</strong></span>年に1回の仕事だと、直したところが次に生きるまでに時間がかかります。</p>
+<h2>基準4・5</h2>
+<p class="item"><span class="sub-ttl"><strong>4. お客さんの名前・金額・住所・電話番号がなくても下書きできる仕事</strong></span>入れてはいけない情報を、最初から使わずに済みます。</p>
+<p class="item"><span class="sub-ttl"><strong>5. 間違っても、出す前に社長が止められる仕事</strong></span>送信や契約にそのままつながる仕事は、最初は避けます。</p>
+<h2>工務店での例</h2>
+<p class="short">ここに挙げるのは、あくまで例です。オリズムで効果を確かめたものではありません。御社の仕事に置き換えて考えてみてください。</p>
+<div class="keep">
+<p class="sub-ttl"><strong>見学会・イベントの告知文</strong></p>
+<ul>
+<li>向いている理由：くり返し出てくる。会社の考え方が出る</li>
+<li>気をつけること：日時・会場は人が書き入れる（AIには書かせない）</li>
+</ul>
+</div>
+<div class="keep">
+<p class="sub-ttl"><strong>OB施主さんへのお便り・ニュースレターの下書き</strong></p>
+<ul>
+<li>向いている理由：テーマが変わっても、言い方のルールは同じ</li>
+<li>気をつけること：お客さんの名前は入れない</li>
+</ul>
+</div>
+<div class="keep">
+<p class="sub-ttl"><strong>SNS投稿の下書き</strong></p>
+<ul>
+<li>向いている理由：数が多く、言い方がぶれやすい</li>
+<li>気をつけること：投稿するのは人</li>
+</ul>
+</div>
+<h2>最初は避けたい仕事</h2>
+<p class="short">逆に、最初は避けたいのはこんな仕事です。</p>
+<ul>
+<li>見積もりや契約書など、金額が決まるもの</li>
+<li>クレームへの最終の返事</li>
+<li>法律や補助金の判断が入るもの</li>
+</ul>
+<p class="short">どれも、AIの下書きより先に、人の判断が要る仕事です。</p>
+<h2>仕事選びのメモ</h2>
+<p class="short">メモアプリに新しいメモを作って、次の項目を書いてみてください。候補は3つまでで大丈夫です。</p>
+<div class="copy-box">
+<div class="copy-body">
+<div class="qline"><b class="k">候補1：</b><span class="fill">（仕事）</span>　当てはまる基準：<span class="fill">（1〜5の番号）</span></div>
+<div class="qline"><b class="k">候補2：</b><span class="fill">（仕事）</span>　当てはまる基準：<span class="fill">（1〜5の番号）</span></div>
+<div class="qline"><b class="k">候補3：</b><span class="fill">（仕事）</span>　当てはまる基準：<span class="fill">（1〜5の番号）</span></div>
+<div class="qline"><b class="k">最初の1人に任せる仕事：</b><span class="fill">（　）</span></div>
+</div>
+</div>
+<p class="short">当てはまる番号がいちばん多いものが、最初の1人の候補です。このメモは自分用です。AIには貼りません。</p>
+</section>
+<section class="chapter">
+<h1 class="chap"><span class="num">2</span><span class="ttl">担当表を作る</span></h1>
+<p class="short">新人が入ったとき、最初に「あなたの担当はこれね」と伝えますよね。AI社員も同じです。</p>
+<p class="short">何を任せて、どこから先は人がやるのか。ここを先に、メモ1つにまとめておきます。</p>
+<p class="short">担当表も自分用のメモです。AIには貼りません。</p>
+<div class="keep">
+<h2>担当表の記入例（架空）</h2>
+<div class="copy-box example">
+<div class="copy-body">
+<div class="qline"><b class="k">担当の名前：</b>見学会の告知係</div>
+<div class="qline"><b class="k">任せる仕事：</b>見学会の告知文の下書き（チラシ用・SNS用）</div>
+<div class="qline"><b class="k">頼む人：</b>社長</div>
+<div class="qline"><b class="k">下書きを確認して直す人：</b>社長</div>
+<div class="qline"><b class="k">出す人（送信・投稿・印刷）：</b>事務の担当者</div>
+<div class="qline"><b class="k">任せないこと：</b>日時・場所の確定、投稿、お客さんの名前を書くこと</div>
+<div class="qline"><b class="k">頼むタイミング：</b>見学会が決まったとき</div>
+</div>
+</div>
+</div>
+<p class="short">御社の場合は、項目はそのままで、「：」のあとを書き換えます。</p>
+<p class="short">「確認して直す人」は、最初は社長にしておくのがいいと思います。直したところに、社長の考え方が入るからです。</p>
+</section>
+<section class="chapter">
+<h1 class="chap"><span class="num">3</span><span class="ttl">ルールシートを書く</span></h1>
+<p class="short">ルールシートは、新人に渡すマニュアルとチェックリストのようなものです。</p>
+<p class="short">このマニュアルのやり方では、AIに頼むたびに、このシートを貼り付けます。毎回貼るから、AIは毎回これを読んでから仕事を始めます。</p>
+<p class="short">記事では「紙1枚分くらいの文章」と書きました。スマホなら、メモ1つに収まるくらいが目安です。</p>
+<h2>書く前に知っておいてほしいこと</h2>
+<p class="short">最初からうまく書けなくても大丈夫です。私の話し方のルールも、AIに「そこは違う」と直しながら、少しずつ言葉になっていきました。</p>
+<p class="short">完璧な1枚より、まず書き始めた1枚の方が先に進みます。迷ったら、新人に口で説明するつもりで、話した言葉をそのまま書いてみてください。</p>
+<h2>参考：私の話し方のルール</h2>
+<p class="short">私の話し方のルールの一部です。</p>
+<ul>
+<li>相手の話をまず「なるほど」と受け止めてから、自分の考えを言う</li>
+<li>否定から入らない</li>
+<li>「〜かもわからないですけど」と、余白を残す</li>
+<li>呼び方は「御社」「お客さん」</li>
+</ul>
+<p class="short">これくらいの短さで十分です。</p>
+<h2>AIに渡すメモを1つ作る</h2>
+<p class="short">ここからは、AIに貼るためのメモを作ります。</p>
+<p class="short">メモアプリで新しいメモを1つ作ってください。「告知係のルール」のように、担当の名前を付けておくと探しやすいです。</p>
+<p class="short">中身は、上からこの順に並べます。</p>
+<ol>
+<li>AIへの頼み方の文例</li>
+<li>ルールシート</li>
+<li>直しメモ</li>
+</ol>
+<p class="short">この順にしておけば、上から下まで全部コピーするだけで、一度で貼れます。</p>
+<h2>LINEのメッセージを3つコピーする</h2>
+<p class="short">文例と、ルールシート・直しメモのひな形は、このマニュアルを受け取ったLINEに、別のメッセージで3つ送っています。長押しでコピーできます。</p>
+<ol>
+<li>メッセージ1（文例）をコピーして、メモに貼る</li>
+<li>その下に、メッセージ2（ルールシート）を貼る</li>
+<li>その下に、メッセージ3（直しメモ）を貼る</li>
+</ol>
+<p class="short">これで、上の順に並びます。各メッセージの1行目の【　】は、どこに貼るかの目印です。そのまま残しておいて大丈夫です。</p>
+<div class="keep">
+<h2>ルールシートのひな形</h2>
+<div class="copy-box">
+<div class="copy-head">【2】ルールシート（文例の下に貼ります）</div>
+<div class="copy-body">
+<div class="qline"><b class="k">担当の名前：</b><span class="fill">（担当表と同じ名前。担当表をまだ書いていなければ、ここで名前を付けます）</span></div>
+<div class="qline"><b class="k">この仕事の目的：</b><span class="fill">（誰に、何を届けるための仕事か。1文で）</span></div>
+<div class="qline"><b class="k">読む人：</b><span class="fill">（どんなお客さんに向けて書くか）</span></div>
+<div class="qline"><b class="k">大事にしている考え方：</b></div>
+<div class="qline">①<span class="fill">（　）</span></div>
+<div class="qline">②<span class="fill">（　）</span></div>
+<div class="qline">③<span class="fill">（　）</span></div>
+<div class="qline"><b class="k">言い方のルール：</b><span class="fill">（使う言葉・使わない言葉、呼び方、です・ます など）</span></div>
+<div class="qline"><b class="k">書かないこと：</b><span class="fill">（大げさな言い方、他社の悪口、決まっていない約束 など）</span></div>
+<div class="qline"><b class="k">出来上がりの形：</b><span class="fill">（文字数の目安、見出しの有無、最後の一文）</span></div>
+<div class="qline"><b class="k">お手本：</b><span class="fill">（社長が「これはいい」と思う過去の文面）</span></div>
+</div>
+</div>
+</div>
+<p class="short">同じものを、このマニュアルを受け取ったLINEに、別のメッセージで送っています（メッセージ2）。長押しでコピーできます。</p>
+<h2>ルールシートの書き方</h2>
+<ul>
+<li>（　）の中を、御社の言葉に書き換えます。（　）の中の説明は、消して書き換えて大丈夫です。</li>
+<li>大事にしている考え方は、3つまでです。</li>
+<li>お手本に貼る過去の文面からは、お客さんの名前・金額・住所・電話番号などを消しておきます（5章）。</li>
+<li>書けない項目は、空けたままで大丈夫です。</li>
+</ul>
+<div class="keep">
+<h2>AIへの頼み方の文例</h2>
+<div class="copy-box">
+<div class="copy-head">【1】AIへの頼み方の文例（メモのいちばん上に貼ります）</div>
+<div class="copy-body">
+<div class="qline">以下は、当社の「<span class="fill">（担当の名前）</span>」のルールです。このルールに沿って、<span class="fill">（仕事の内容）</span>の下書きを作ってください。</div>
+<div class="qline"><b class="k">条件：</b><span class="fill">（文字数・使う場面など）</span></div>
+<div class="qline"><b class="k">今回の材料：</b><span class="fill">（例：見学会なら、どんな家か・見てほしいところ・誰に来てほしいか。日時・会場は入れず、あとで人が書き入れる）</span></div>
+<div class="qline">材料に書いていないことは、書かないでください。分からないところがあれば、作る前に質問してください。</div>
+<div class="qline sep">――ここから下が、ルールシートと直しメモです――</div>
+</div>
+</div>
+</div>
+<p class="short">同じものを、このマニュアルを受け取ったLINEに、別のメッセージで送っています（メッセージ1）。長押しでコピーできます。</p>
+<h2>文例の使い方</h2>
+<ul>
+<li>頼むたびに書き換えるのは、（　）の中だけです。</li>
+<li>2回目からは、「条件」と「今回の材料」を、その回のものに書き換えます。</li>
+<li>最後の「――」の行は区切りなので、消さずにそのまま残しておきます。</li>
+<li>「今回の材料」にも、お客さんの名前・金額・住所・電話番号などは入れません（5章）。</li>
+</ul>
+<h2>最初の1回の流れ</h2>
+<p class="short">画面の細かい操作は、アプリによって違いますし、変わることもあります。ここでは流れだけ書いておきます。</p>
+<ol>
+<li>（　）の中を書き換えたら、メモを上から下まで全部コピーする（メモの文字を長押しして「すべて選択」→「コピー」。機種によって表示が少し違います）。AIのアプリを開き、文字を打ち込む欄に貼って送る。</li>
+<li>AIから質問が返ってきたら、分かる範囲で答えて送る。</li>
+<li>下書きが返ってきたら、コピーして別のメモに貼り、社長が自分で直す。</li>
+<li>直したところを、直しメモに1行書く（4章）。</li>
+</ol>
+<h2>2回目からも、毎回貼ります</h2>
+<p class="short">下書きを別のメモに貼るのは、AIに渡すメモの並びを崩さないためです。</p>
+<p class="short">社長が自分で直したところが、次のルールの元になります。</p>
+<p class="short">2回目からも、貼るのを省かずに、毎回この流れで頼んでください。</p>
+</section>
+<section class="chapter">
+<h1 class="chap"><span class="num">4</span><span class="ttl">直しメモをつける</span></h1>
+<p class="short">ここが結構大事なところです。</p>
+<p class="short">AIの下書きを直したら、何を直したかを1行で書き残します。そして次に頼むとき、そのメモもAIに読ませます。</p>
+<p class="short">新人に注意したことを、本人がノートに書いておく。あれと同じです。ノートがないと、同じ注意を何度もすることになりますよね。</p>
+<h2>記事の「1枚に書き足していく」との関係</h2>
+<p class="short">記事では「直したところは、1枚に書き足していく」と書きました。</p>
+<p class="short">このマニュアルでは、それを2段に分けています。直したところはいったん直しメモに書き、何度も出てきたものをルールシートに移します。</p>
+<h2>私の場合</h2>
+<p class="short">オリズムでは2026年7月から、AIに「そこは違う」と言ったことを1行ずつ貯めてきました。いちばん多く直したのは口調でした。</p>
+<p class="short">私の考え方や話し方を覚えさせたAI社員を、「AI錦織」と呼んでいます。AI錦織のメモは、10月末の時点で193行あります。注意されたことだけでなく、気づきも含めた行数です。</p>
+<p>メモは月に1回整理して、重なっているものをまとめ、古くなったものは書き直します。私が確認して「これは決まりにしよう」と思ったものは、正式なルールに格上げします。8月には、11件をまとめて格上げしました。</p>
+<div class="keep">
+<h2>直しメモのひな形</h2>
+<div class="copy-box">
+<div class="copy-head">【3】直しメモ（ルールシートの下に貼ります）</div>
+<div class="copy-body">
+<div class="qline"><span class="fill">（日付）</span></div>
+<div class="qline"><b class="k">直したこと：</b><span class="fill">（AIの下書き）</span>→<span class="fill">（どう直したか）</span></div>
+<div class="qline"><b class="k">次からのルール：</b><span class="fill">（1行で）</span></div>
+</div>
+</div>
+</div>
+<p class="short">同じものを、このマニュアルを受け取ったLINEに、別のメッセージで送っています（メッセージ3）。長押しでコピーできます。</p>
+<p class="short">直すたびに、いちばん下に「日付・直したこと・次からのルール」の3行を足していきます。</p>
+<div class="keep">
+<h2>直しメモの記入例（架空）</h2>
+<div class="copy-box example">
+<div class="copy-body">
+<div class="qline ex-label">記入例（架空）</div>
+<div class="qline"><b class="k">直したこと：</b>「〜させていただきます」が続いて固い → 「〜します」にした</div>
+<div class="qline"><b class="k">次からのルール：</b>「させていただきます」は1回まで</div>
+<div class="qgap"></div>
+<div class="qline ex-label">記入例（架空）</div>
+<div class="qline"><b class="k">直したこと：</b>「ご来場お待ちしております！」が3回出てきた → 最後の1回だけ残した</div>
+<div class="qline"><b class="k">次からのルール：</b>同じ呼びかけはくり返さない</div>
+</div>
+</div>
+</div>
+<div class="keep">
+<h2>メモの使い方</h2>
+<ul>
+<li>書くのは1行で十分です。きれいに書かなくて大丈夫です。</li>
+<li>直しメモはルールシートと同じメモに入っているので、全部コピーすれば一緒に貼れます。</li>
+<li>同じ直しが何度も出てきたら、ルールシートに格上げします。移したら、その日付の前に「済」と書いておきます。</li>
+</ul>
+</div>
+<h2>格上げと整理の目安</h2>
+<p class="short">私のところでは、同じ種類の間違いが3回続いたのをきっかけに、正式なルールにしたことがあります。3回くらいを目安にしてもいいかもわからないですね。</p>
+<p class="short">月に1回、重なっているものをまとめ、古くなったものは書き直すか消します。</p>
+</section>
+<section class="chapter">
+<h1 class="chap"><span class="num">5</span><span class="ttl">AIにやらせないこと</span></h1>
+<p class="short">任せることと同じくらい大事なのが、やらせないことを先に決めることです。新人にも「ここから先は、私に確認してからにしてね」という線を引きますよね。</p>
+<p class="short">オリズムでも、noteの公開、SNSへの投稿、メールやLINEの配信は、AIはしません。AIが作るのは文面までで、出すのは人間です。</p>
+<h2>入れない情報</h2>
+<p class="short">AIに貼り付ける文章には、次のものを入れないでください。</p>
+<ul>
+<li>お客さんの名前</li>
+<li>金額（見積もり・契約金額など）</li>
+<li>住所（建築地も含めて）</li>
+<li>電話番号やメールアドレスなど、個人が分かるもの</li>
+</ul>
+<p class="short">必要なときは「A様」「◯◯万円」「◯◯市」のように置き換えて頼みます。本当の名前や数字は、仕上げのときに人が書き入れます。</p>
+<div class="note-box"><p>補足：使うサービスの、入力した内容の扱いについての説明を一度読んでおくと安心です。</p></div>
+<h2>人がやること（最終判断）</h2>
+<ul>
+<li><strong>送信</strong>：メール・LINE・お問い合わせへの返信</li>
+<li><strong>投稿</strong>：SNS・ホームページ・チラシの入稿など</li>
+<li><strong>契約に関わる判断</strong>：金額・条件・お客さんとの約束ごと</li>
+<li><strong>確認</strong>：数字・日付・法律や補助金に関わる内容。AIは間違えることがあるので、元の資料で確かめます。あわせて、渡した材料にない事柄（家の特徴やイベントの中身など）が足されていないかも見ます</li>
+</ul>
+<h2>うちのAIにやらせないこと</h2>
+<ul>
+<li>お客さんの名前・金額・住所・電話番号などを入れない</li>
+<li>送信・投稿はAIにさせない。出すのは人</li>
+<li>契約に関わる判断はAIに任せない</li>
+<li>数字・日付は、人が元の資料で確かめる</li>
+<li>材料にない事柄が足されていないか、人が見る</li>
+</ul>
+<p class="short">御社で足すことがあれば、自分用のメモに、この5つと一緒に書いておいてください。</p>
+</section>
+<section class="chapter">
+<h1 class="chap"><span class="num">6</span><span class="ttl">1か月の進め方</span></h1>
+<p class="short">1か月で目指すのは、最初の1人が「ルールシートと直しメモを読んでから仕事を始める形」ができることです。</p>
+<p class="short">作業時間がどれだけ減るかは、ここでは約束できません。私自身、測っていないからです。</p>
+<p class="short">毎週、直す時間を先にカレンダーに入れておいてください。後回しにすると、直しメモが貯まりません。</p>
+<div class="keep">
+<h2>1週目：選ぶ・書く</h2>
+<p class="sub-ttl"><strong>最低これだけ</strong></p>
+<ul>
+<li>仕事選びのメモで、1つ選ぶ</li>
+<li>AIに渡すメモを作り（LINEのメッセージ1〜3を貼る）、ルールシートの最初の1枚を書く</li>
+</ul>
+</div>
+<div class="keep">
+<p class="sub-ttl"><strong>余裕があれば</strong></p>
+<ul>
+<li>担当表を書く</li>
+<li>やらせないことに、御社の分を足す</li>
+</ul>
+</div>
+<div class="keep">
+<h2>2週目：頼む・直す</h2>
+<p class="sub-ttl"><strong>頼む前に</strong></p>
+<ul>
+<li>AIのアプリを使える状態にする</li>
+<li>AIに渡すメモが「文例 → ルールシート → 直しメモ」の順になっているか見る（3章）</li>
+<li>振り返りメモ（6章の後半）に目を通す</li>
+</ul>
+</div>
+<div class="keep">
+<p class="sub-ttl"><strong>そのあと</strong></p>
+<ul>
+<li>3章の流れで下書きを頼む</li>
+<li>直したところを、直しメモに1行ずつ書く</li>
+</ul>
+</div>
+<div class="keep">
+<h2>3週目・4週目</h2>
+<p class="sub-ttl"><strong>3週目：育てる</strong></p>
+<ul>
+<li>直しメモを読み返し、何度も出てきた直しをルールシートに格上げする</li>
+<li>書き直した1枚で、同じ種類の仕事を頼んでみる</li>
+</ul>
+</div>
+<div class="keep">
+<p class="sub-ttl"><strong>4週目：振り返る</strong></p>
+<ul>
+<li>振り返りメモを書く</li>
+<li>次の1か月を「続ける・形を変える・やめる」から決める</li>
+</ul>
+</div>
+<h2>仕事が出てこない週は</h2>
+<p class="short">選んだ仕事が、その週に出てこないこともあると思います。そのときは、過去の仕事（前回の告知文など）で練習して大丈夫です。</p>
+<p class="short">過去の告知文には、会場の住所や問い合わせ先が入っていることが多いです。貼る前に、お客さんの名前・金額・住所・電話番号など（5章）を消しておいてください。</p>
+<h2>1か月後の振り返りメモ</h2>
+<p class="short">何を見て続けるかを、頼み始める前に決めておきます。決めておかないと、なんとなく続いて、なんとなく止まってしまうからです。</p>
+<p class="short">自分用のメモに、次の項目を書いておきます。</p>
+<div class="copy-box">
+<div class="copy-body">
+<div class="qline"><b class="k">直しメモは何行たまったか：</b><span class="fill">（　）</span>行</div>
+<div class="qline"><b class="k">ルールシートに格上げしたルールは何個か：</b><span class="fill">（　）</span>個</div>
+<div class="qline"><b class="k">同じ直しが減ってきた感じはあるか：</b>ある・少しある・ない</div>
+<div class="qline"><b class="k">直す時間は、誰の、どの時間から出ていたか：</b><span class="fill">（　）</span></div>
+<div class="qline"><b class="k">社長の考え方で、新しく言葉になったこと：</b><span class="fill">（　）</span></div>
+<div class="qline"><b class="k">次の1か月：</b>続ける・形を変える・やめる</div>
+</div>
+</div>
+<p class="short">選ぶ項目は、当てはまるもの1つを残して、あとは消します。</p>
+<h2>もし「やめる」と決めても</h2>
+<p class="short">もし「やめる」と決めても、ルールシートと直しメモは手元に残ります。社長の考え方を言葉にしたメモです。</p>
+<p class="short">人の新人を迎えるときにも、使えるかもわからないですね。</p>
+<h2>2人目は、1人目が回ってから</h2>
+<p class="short">いきなり何人もいりません。私も、noteの運用を手伝うAI社員を10人作ったのは、7月からAI錦織と仕事をしてきたあとの10月末でした。</p>
+<p class="short">1人目のルールシートと直しメモが回り始めたら、2人目を考えるくらいで十分だと思います。</p>
+<h2>おわりに</h2>
+<p class="short">「それで何が楽になるの」。顧問先の社長のこの一言から、記事を書きました。</p>
+<p class="short">今の私の答えは、こうです。</p>
+<p class="statement"><strong>作業がゼロになるのではなく、社長の考え方と直したところが、会社に残るようになる。</strong></p>
+<h2>直す時間は、社長から出ます</h2>
+<p class="short">利用料が安くても、答える・選ぶ・直す時間は社長から出ていきます。そこだけは、最初に勘定に入れておいてください。</p>
+<p class="short">それでも、社長が毎回口で伝えていたことが、メモに残ります。社長がその場にいないときにも届く形です。</p>
+<p class="short">まずは小さな一歩として、今週、メモアプリに候補の仕事を3つまで書いてみてください。</p>
+<h2>困ったときの窓口</h2>
+<p class="short">進めていて分からないところがあれば、このマニュアルを受け取ったLINEに、そのまま質問を送ってください。私、錦織がお返事します。</p>
+</section>
+</body>
+</html>
